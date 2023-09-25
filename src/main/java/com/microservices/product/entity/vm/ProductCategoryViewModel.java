@@ -18,6 +18,8 @@ public class ProductCategoryViewModel {
     private Integer id;
 	@JsonProperty("name")
     private String name;
+	@JsonProperty("outlet_id")
+    private Integer outletId;
 	@JsonProperty("total_product")
     private Integer totalProduct;
 	@JsonProperty("products")

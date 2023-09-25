@@ -34,8 +34,8 @@ public class Outlet {
     private Integer id;
 	@Column(name = "NAME")
     private String name;
-	@Column(name = "TOTAL_CATEGORY")
-    private Integer totalCategory;
+	@Column(name = "TOTAL_PRODUCT_CATEGORY")
+    private Integer totalProductCategory;
     @OneToMany(fetch = FetchType.LAZY, mappedBy="outlet", cascade = CascadeType.ALL)
     private List<ProductCategory> productCategories;
 }

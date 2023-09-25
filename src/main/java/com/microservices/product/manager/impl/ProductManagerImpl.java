@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.microservices.product.entity.Product;
+import com.microservices.product.entity.ProductCategory;
 import com.microservices.product.entity.request.ProductRequest;
 import com.microservices.product.entity.vm.ManagerViewModel;
 import com.microservices.product.entity.vm.ProductViewModel;
@@ -94,10 +95,14 @@ public class ProductManagerImpl extends ErrorDetailInfoList implements ProductMa
         	request.setId(null);
         	Product product = new Product();
     		BeanUtils.copyProperties(request, product);
+        	ProductCategory productCategory = new ProductCategory();
+        	productCategory.setId(request.getProductCategoryId());
+        	product.setProductCategory(productCategory);
 			Product newData = productRepository.saveProduct(hashing, product);
     		if(newData.getId() != null) {
     			ProductViewModel vm = new ProductViewModel();
         		BeanUtils.copyProperties(newData, vm);
+        		vm.setProductCategoryId(newData.getProductCategory().getId());
 				mvm.setContent(vm);
 				mvm.setInfo(getInfoOk("Success"));
 				mvm.setTotalRows(1);
@@ -122,10 +127,14 @@ public class ProductManagerImpl extends ErrorDetailInfoList implements ProductMa
         try {
         	Product product = new Product();
     		BeanUtils.copyProperties(request, product);
+        	ProductCategory productCategory = new ProductCategory();
+        	productCategory.setId(request.getProductCategoryId());
+        	product.setProductCategory(productCategory);
 			Product newData = productRepository.updateProduct(hashing, product);
     		if(newData.getId() != null) {
     			ProductViewModel vm = new ProductViewModel();
         		BeanUtils.copyProperties(newData, vm, "productCategories");
+        		vm.setProductCategoryId(newData.getProductCategory().getId());
 				mvm.setContent(vm);
 				mvm.setInfo(getInfoOk("Success"));
 				mvm.setTotalRows(1);
@@ -172,6 +181,7 @@ public class ProductManagerImpl extends ErrorDetailInfoList implements ProductMa
 	public ProductViewModel entityToViewModel(Product product) {
     	ProductViewModel vm = new ProductViewModel();
 		BeanUtils.copyProperties(product, vm);
+		vm.setProductCategoryId(product.getProductCategory().getId());
         return vm;
     }
 }

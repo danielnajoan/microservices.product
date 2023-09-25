@@ -66,58 +66,74 @@ public class OutletRepositoryImpl implements OutletRepository {
 	
 	@Override
 	public Outlet saveOutlet(long hashing, Outlet outlet) {
-        Transaction transaction = null;
-          try (Session session = entityManager.unwrap(Session.class)) {
-              transaction = session.beginTransaction();
-              String hql = "INSERT INTO T_OUTLET (NAME,TOTAL_CATEGORY,ID) "
-              		+ "VALUES(?,?,t_outlet_id_seq.nextval)";
-              Query query = session.createNativeQuery(hql); 
-              query.setParameter(1, outlet.getName());
-              query.setParameter(2, outlet.getTotalCategory());
-              query.executeUpdate();
-              String hqlId = "SELECT t_outlet_id_seq.currval FROM DUAL";
-              BigDecimal id = (BigDecimal) session.createNativeQuery(hqlId).getSingleResult();
-              outlet.setId(id.intValue());
-              
-              transaction.commit();
-        } catch (Exception e) {
-            if (transaction != null) {
-            	transaction.rollback();
-            }
-            String errMsg = Utils.starckTraceToString(e);
+	    Session session = entityManager.unwrap(Session.class);
+	    Transaction transaction = null;
+	    try {
+	        transaction = session.beginTransaction();
+
+	        String insertSql = "INSERT INTO T_OUTLET (id, name) VALUES (t_outlet_id_seq.NEXTVAL, :name)";
+	        Query insertQuery = session.createNativeQuery(insertSql);
+	        insertQuery.setParameter("name", outlet.getName());
+	        insertQuery.executeUpdate();
+	        
+            String getNewId = "SELECT t_outlet_id_seq.currval FROM DUAL";
+            BigDecimal newId = (BigDecimal) session.createNativeQuery(getNewId).getSingleResult();
+            
+            // Create native query to select the newly added outlet
+            String fetchOutletSql = "SELECT * FROM T_OUTLET WHERE id = " + newId;
+            Query fetchOutletQuery = session.createNativeQuery(fetchOutletSql, Outlet.class);
+            Outlet insertedOutlet = (Outlet) fetchOutletQuery.getSingleResult();
+
+
+	        transaction.commit();
+
+	        return insertedOutlet;
+	    } catch (Exception e) {
+	        if (transaction != null) {
+	            transaction.rollback();
+	        }
+			String errMsg = Utils.starckTraceToString(e);
 			logger.error("(" + hashing + ") " + errMsg);
-		}
-		return outlet;
-    }
+	    } finally {
+	        session.close();
+	    }
+	    return null;
+	}
 
 	@Override
 	public Outlet updateOutlet(long hashing, Outlet outlet) {
-        Transaction transaction = null;
-		Outlet newData = new Outlet();
-        try (Session session = entityManager.unwrap(Session.class)) {
-            transaction = session.beginTransaction();
-            String hql = "UPDATE T_OUTLET SET NAME = ?, TOTAL_CATEGORY = ? WHERE ID = ? ";
-            Query query = session.createNativeQuery(hql); 
-            query.setParameter(1, outlet.getName());
-            query.setParameter(2, outlet.getTotalCategory());
-            query.setParameter(3, outlet.getId());
-            query.executeUpdate();
-            
+	    Session session = entityManager.unwrap(Session.class);
+	    Transaction transaction = null;
 
-            String hqlNewRecord = "SELECT * FROM T_OUTLET WHERE ID = ?";
-            Query queryNewRecord = session.createNativeQuery(hqlNewRecord, Outlet.class);
-            queryNewRecord.setParameter(1, outlet.getId());
-            newData = (Outlet) queryNewRecord.getSingleResult();
-            
-            transaction.commit();
-        } catch (Exception e) {
-            if (transaction != null) {
-            	transaction.rollback();
-            }
+	    try {
+	        transaction = session.beginTransaction();
+	        String updateSql = "UPDATE T_OUTLET SET name = :name WHERE id = :outletId";
+
+	        Query updateQuery = session.createNativeQuery(updateSql);
+	        updateQuery.setParameter("name", outlet.getName());
+	        updateQuery.setParameter("outletId", outlet.getId());
+
+	        int updatedRows = updateQuery.executeUpdate();
+
+	        if (updatedRows > 0) {
+	            String fetchOutletSql = "SELECT * FROM T_OUTLET WHERE id = :outletId";
+	            Query fetchOutletQuery = session.createNativeQuery(fetchOutletSql, Outlet.class);
+	            fetchOutletQuery.setParameter("outletId", outlet.getId());
+
+	            Outlet updatedOutlet = (Outlet) fetchOutletQuery.getSingleResult();
+	            transaction.commit();
+	            return updatedOutlet;
+	        }
+	    } catch (Exception e) {
+	        if (transaction != null) {
+	            transaction.rollback();
+	        }
 			String errMsg = Utils.starckTraceToString(e);
 			logger.error("(" + hashing + ") " + errMsg);
-		}
-		return newData;
+	    } finally {
+	        session.close();
+	    }
+	    return null;
 	}
 
 	@Override
@@ -125,12 +141,24 @@ public class OutletRepositoryImpl implements OutletRepository {
         Transaction transaction = null;
         try (Session session = entityManager.unwrap(Session.class)) {
             transaction = session.beginTransaction();
-            String hql = "DELETE FROM T_OUTLET WHERE ID = ?";
-            Query query = session.createNativeQuery(hql, Outlet.class); 
-            query.setParameter(1, id);
-            query.executeUpdate();
+            String deleteProductsSql = "DELETE FROM T_PRODUCT WHERE product_category_id IN " +
+                    "(SELECT id FROM T_PRODUCT_CATEGORY WHERE outlet_id = :outletId)";
+            Query deleteProductsQuery = session.createNativeQuery(deleteProductsSql);
+            deleteProductsQuery.setParameter("outletId", id);
+            int productsDeleted = deleteProductsQuery.executeUpdate();
+
+            String deleteCategoriesSql = "DELETE FROM T_PRODUCT_CATEGORY WHERE outlet_id = :outletId";
+            Query deleteCategoriesQuery = session.createNativeQuery(deleteCategoriesSql);
+            deleteCategoriesQuery.setParameter("outletId", id);
+            int categoriesDeleted = deleteCategoriesQuery.executeUpdate();
+
+            String deleteOutletSql = "DELETE FROM T_OUTLET WHERE id = :id";
+            Query deleteOutletQuery = session.createNativeQuery(deleteOutletSql);
+            deleteOutletQuery.setParameter("id", id);
+            int outletDeleted = deleteOutletQuery.executeUpdate();
+
             transaction.commit();
-            return true;
+            return productsDeleted > 0 || categoriesDeleted > 0 || outletDeleted > 0;
         } catch (Exception e) {
             if (transaction != null) {
             	transaction.rollback();

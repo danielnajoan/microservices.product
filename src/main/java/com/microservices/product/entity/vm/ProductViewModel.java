@@ -20,4 +20,6 @@ public class ProductViewModel {
     private String description;
 	@JsonProperty("price")
     private Integer price;
+	@JsonProperty("product_category_id")
+    private Integer productCategoryId;
 }

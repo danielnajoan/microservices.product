@@ -99,7 +99,7 @@ public class OutletManagerImpl extends ErrorDetailInfoList implements OutletMana
 			Outlet newData = outletRepository.saveOutlet(hashing, outlet);
     		if(newData.getId() != null) {
     			OutletViewModel vm = new OutletViewModel();
-        		BeanUtils.copyProperties(newData, vm);
+        		BeanUtils.copyProperties(newData, vm, "productCategories");
 				mvm.setContent(vm);
 				mvm.setInfo(getInfoOk("Success"));
 				mvm.setTotalRows(1);

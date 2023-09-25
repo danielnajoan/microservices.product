@@ -16,6 +16,4 @@ public class OutletRequest {
     private Integer id;
 	@JsonProperty("name")
     private String name;
-	@JsonProperty("total_category")
-    private Integer totalCategory;
 }

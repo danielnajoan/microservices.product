@@ -16,6 +16,6 @@ public class ProductCategoryRequest {
     private Integer id;
 	@JsonProperty("name")
     private String name;
-	@JsonProperty("total_product")
-    private Integer totalProduct;
+	@JsonProperty("outlet_id")
+    private Integer outletId;
 }

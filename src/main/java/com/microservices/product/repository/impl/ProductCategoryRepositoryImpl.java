@@ -64,29 +64,48 @@ public class ProductCategoryRepositoryImpl implements ProductCategoryRepository 
 	
 	@Override
 	public ProductCategory saveProductCategory(long hashing, ProductCategory productCategory) {
-        Transaction transaction = null;
-          try (Session session = entityManager.unwrap(Session.class)) {
-              transaction = session.beginTransaction();
-              String hql = "INSERT INTO T_PRODUCT_CATEGORY (NAME,TOTAL_PRODUCT,ID) "
-              		+ "VALUES(?,?,t_product_category_id_seq.nextval)";
-              Query query = session.createNativeQuery(hql); 
-              query.setParameter(1, productCategory.getName());
-              query.setParameter(2, productCategory.getTotalProduct());
-              query.executeUpdate();
-              String hqlId = "SELECT t_product_category_id_seq.currval FROM DUAL";
-              BigDecimal id = (BigDecimal) session.createNativeQuery(hqlId).getSingleResult();
-              productCategory.setId(id.intValue());
-              
-              transaction.commit();
-        } catch (Exception e) {
-            if (transaction != null) {
-            	transaction.rollback();
-            }
+	    Session session = entityManager.unwrap(Session.class);
+	    Transaction transaction = null;
+
+	    try {
+	        transaction = session.beginTransaction();
+	        String insertSql = "INSERT INTO T_PRODUCT_CATEGORY (id, name, outlet_id) " +
+	                "VALUES (t_product_category_id_seq.NEXTVAL, :name, :outletId)";
+
+	        Query insertQuery = session.createNativeQuery(insertSql);
+	        insertQuery.setParameter("name", productCategory.getName());
+	        insertQuery.setParameter("outletId", productCategory.getOutlet().getId());
+	        insertQuery.executeUpdate();
+
+            String getNewId = "SELECT t_product_category_id_seq.currval FROM DUAL";
+            BigDecimal newId = (BigDecimal) session.createNativeQuery(getNewId).getSingleResult();
+
+	        String updateTotalProductCategorySql = "UPDATE T_OUTLET " +
+	                "SET total_product_category = total_product_category + 1 " +
+	                "WHERE id = :outletId";
+
+	        Query updateTotalProductCategoryQuery = session.createNativeQuery(updateTotalProductCategorySql);
+	        updateTotalProductCategoryQuery.setParameter("outletId", productCategory.getOutlet().getId());
+	        updateTotalProductCategoryQuery.executeUpdate();
+
+	        String fetchProductCategorySql = "SELECT * FROM T_PRODUCT_CATEGORY WHERE id = :categoryId";
+	        Query fetchProductCategoryQuery = session.createNativeQuery(fetchProductCategorySql, ProductCategory.class);
+	        fetchProductCategoryQuery.setParameter("categoryId", newId);
+
+	        ProductCategory insertedProductCategory = (ProductCategory) fetchProductCategoryQuery.getSingleResult();
+	        transaction.commit();
+	        return insertedProductCategory;
+	    } catch (Exception e) {
+	        if (transaction != null) {
+	            transaction.rollback();
+	        }
             String errMsg = Utils.starckTraceToString(e);
 			logger.error("(" + hashing + ") " + errMsg);
-		}
-		return productCategory;
-    }
+	    } finally {
+	        session.close();
+	    }
+	    return null;
+	}
 
 	@Override
 	public ProductCategory updateProductCategory(long hashing, ProductCategory productCategory) {
@@ -94,20 +113,20 @@ public class ProductCategoryRepositoryImpl implements ProductCategoryRepository 
 		ProductCategory newData = new ProductCategory();
         try (Session session = entityManager.unwrap(Session.class)) {
             transaction = session.beginTransaction();
-            String hql = "UPDATE T_PRODUCT_CATEGORY SET NAME = ?, TOTAL_PRODUCT = ? WHERE ID = ? ";
-            Query query = session.createNativeQuery(hql); 
-            query.setParameter(1, productCategory.getName());
-            query.setParameter(2, productCategory.getTotalProduct());
-            query.setParameter(3, productCategory.getId());
-            query.executeUpdate();
-            
+            String sql = "UPDATE T_PRODUCT_CATEGORY " +
+                    "SET name = CASE WHEN :name IS NOT NULL AND :name <> name THEN :name ELSE name END, " +
+                    "    outlet_id = CASE WHEN :outletId IS NOT NULL AND :outletId <> outlet_id THEN :outletId ELSE outlet_id END " +
+                    "WHERE id = :id " +
+                    "RETURNING *";
 
-            String hqlNewRecord = "SELECT * FROM T_PRODUCT_CATEGORY WHERE ID = ?";
-            Query queryNewRecord = session.createNativeQuery(hqlNewRecord, ProductCategory.class);
-            queryNewRecord.setParameter(1, productCategory.getId());
-            newData = (ProductCategory) queryNewRecord.getSingleResult();
-            
+            Query query = session.createNativeQuery(sql, ProductCategory.class);
+            query.setParameter("name", productCategory.getName());
+            query.setParameter("outletId", productCategory.getOutlet().getId());
+            query.setParameter("id", productCategory.getId());
+
+            List<ProductCategory> updatedCategories = query.getResultList();
             transaction.commit();
+            return updatedCategories.isEmpty() ? null : updatedCategories.get(0);
         } catch (Exception e) {
             if (transaction != null) {
             	transaction.rollback();
@@ -123,12 +142,28 @@ public class ProductCategoryRepositoryImpl implements ProductCategoryRepository 
         Transaction transaction = null;
         try (Session session = entityManager.unwrap(Session.class)) {
             transaction = session.beginTransaction();
-            String hql = "DELETE FROM T_PRODUCT_CATEGORY WHERE ID = ?";
-            Query query = session.createNativeQuery(hql, ProductCategory.class); 
-            query.setParameter(1, id);
-            query.executeUpdate();
-            transaction.commit();
-            return true;
+            String deleteProductsSql = "DELETE FROM T_PRODUCT WHERE product_category_id = :productCategoryId";
+            Query deleteProductsQuery = session.createNativeQuery(deleteProductsSql);
+            deleteProductsQuery.setParameter("productCategoryId", id);
+            int productsDeleted = deleteProductsQuery.executeUpdate();
+
+            String deleteCategorySql = "DELETE FROM T_PRODUCT_CATEGORY WHERE id = :id";
+            Query deleteCategoryQuery = session.createNativeQuery(deleteCategorySql);
+            deleteCategoryQuery.setParameter("id", id);
+            int categoryDeleted = deleteCategoryQuery.executeUpdate();
+
+            if (productsDeleted > 0 || categoryDeleted > 0) {
+                String updateTotalProductCategorySql = "UPDATE T_OUTLET " +
+                        "SET total_product_category = (SELECT COUNT(*) FROM T_PRODUCT_CATEGORY WHERE outlet_id = :outletId) " +
+                        "WHERE id = :outletId";
+                Query updateQuery = session.createNativeQuery(updateTotalProductCategorySql);
+                updateQuery.setParameter("outletId", id);
+                updateQuery.executeUpdate();
+                transaction.commit();
+                return true;
+            } else {
+                return false;
+            }
         } catch (Exception e) {
             if (transaction != null) {
             	transaction.rollback();

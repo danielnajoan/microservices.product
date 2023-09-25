@@ -18,8 +18,8 @@ public class OutletViewModel {
     private Integer id;
 	@JsonProperty("name")
     private String name;
-	@JsonProperty("total_category")
-    private Integer totalCategory;
+	@JsonProperty("total_product_category")
+    private Integer totalProductCategory;
 	@JsonProperty("product_categories")
     private List<ProductCategoryViewModel> productCategories;
 }

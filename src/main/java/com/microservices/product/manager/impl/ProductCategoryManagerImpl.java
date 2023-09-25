@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.microservices.product.entity.ProductCategory;
+import com.microservices.product.entity.Outlet;
 import com.microservices.product.entity.Product;
 import com.microservices.product.entity.request.ProductCategoryRequest;
 import com.microservices.product.entity.vm.ManagerViewModel;
@@ -41,7 +42,6 @@ public class ProductCategoryManagerImpl extends ErrorDetailInfoList implements P
 		List<ProductCategoryViewModel> lvm = new ArrayList<>();
 		try {
 			List<ProductCategory> listData = productCategoryRepository.getAllProductCategory(hashing, page, size, orderby);
-			System.out.println(listData.toString());
 			if (null != listData && listData.size() > 0) {
 		        lvm = listData.stream().map(this::entityToViewModel).collect(Collectors.toList());
 				mvm.setContent(lvm);
@@ -96,10 +96,13 @@ public class ProductCategoryManagerImpl extends ErrorDetailInfoList implements P
         	request.setId(null);
         	ProductCategory productCategory = new ProductCategory();
     		BeanUtils.copyProperties(request, productCategory);
+    		Outlet outlet = new Outlet();
+    		outlet.setId(request.getOutletId());
+    		productCategory.setOutlet(outlet);
 			ProductCategory newData = productCategoryRepository.saveProductCategory(hashing, productCategory);
     		if(newData.getId() != null) {
     			ProductCategoryViewModel vm = new ProductCategoryViewModel();
-        		BeanUtils.copyProperties(newData, vm);
+        		BeanUtils.copyProperties(newData, vm, "products");
 				mvm.setContent(vm);
 				mvm.setInfo(getInfoOk("Success"));
 				mvm.setTotalRows(1);
@@ -124,10 +127,13 @@ public class ProductCategoryManagerImpl extends ErrorDetailInfoList implements P
         try {
         	ProductCategory productCategory = new ProductCategory();
     		BeanUtils.copyProperties(request, productCategory);
+    		Outlet outlet = new Outlet();
+    		outlet.setId(request.getOutletId());
+    		productCategory.setOutlet(outlet);
 			ProductCategory newData = productCategoryRepository.updateProductCategory(hashing, productCategory);
     		if(newData.getId() != null) {
     			ProductCategoryViewModel vm = new ProductCategoryViewModel();
-        		BeanUtils.copyProperties(newData, vm, "productCategories");
+        		BeanUtils.copyProperties(newData, vm, "products");
 				mvm.setContent(vm);
 				mvm.setInfo(getInfoOk("Success"));
 				mvm.setTotalRows(1);
@@ -179,6 +185,7 @@ public class ProductCategoryManagerImpl extends ErrorDetailInfoList implements P
 				.map(this::productEntityToProductViewModel)
 				.collect(Collectors.toList());
 		vm.setProducts(listProductVm);
+		vm.setOutletId(productCategory.getOutlet().getId());
         return vm;
     }
     
